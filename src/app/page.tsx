@@ -105,6 +105,7 @@ export default function ChatPage() {
       let buffer = '';
       let fullContent = '';
       let currentAgent = 'pm';
+      let currentEventType = 'message'; // 事件类型需要在行之间保持
 
       while (true) {
         const { done, value } = await reader.read();
@@ -115,13 +116,11 @@ export default function ChatPage() {
         buffer = lines.pop() || '';
 
         for (const line of lines) {
-          // 解析事件
-          let eventType = 'message';
           let eventData: any = {};
 
           if (line.startsWith('event: ')) {
-            eventType = line.slice(7);
-            // 尝试获取后续的 data 行
+            currentEventType = line.slice(7);
+            // 继续等待对应的 data 行
             continue;
           } else if (line.startsWith('data: ')) {
             try {
@@ -132,6 +131,9 @@ export default function ChatPage() {
           } else {
             continue;
           }
+
+          // 使用保存的事件类型
+          const eventType = currentEventType;
 
           // 处理事件
           switch (eventType) {
