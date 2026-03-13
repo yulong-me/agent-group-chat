@@ -7,13 +7,29 @@ import { AgentList } from '@/components/AgentList';
 import { MessageList } from '@/components/MessageList';
 import { MessageInput } from '@/components/MessageInput';
 import { TaskPanel } from '@/components/TaskPanel';
+import { SessionList } from '@/components/SessionList';
+import { QuickCommands } from '@/components/QuickCommands';
+import { TaskDetailModal } from '@/components/TaskDetailModal';
 import { Message, Task } from '@/types';
 
 export default function ChatPage() {
   const router = useRouter();
-  const { agents, messages, addMessage, currentUser, setCurrentUser, tasks, addTask, setTasks } = useStore();
+  const {
+    agents,
+    messages,
+    addMessage,
+    currentUser,
+    setCurrentUser,
+    tasks,
+    addTask,
+    sessions,
+    currentSessionId,
+  } = useStore();
+
   const [isLoading, setIsLoading] = useState(false);
   const [showTaskPanel, setShowTaskPanel] = useState(true);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [quickCommand, setQuickCommand] = useState('');
 
   // Initialize current user on mount
   useEffect(() => {
@@ -83,6 +99,7 @@ export default function ChatPage() {
             type: 'agent',
             agentId: resp.agentId,
             mentions,
+            usage: resp.usage,
           };
           addMessage(agentMessage);
         }
@@ -90,7 +107,6 @@ export default function ChatPage() {
     } catch (error) {
       console.error('Chat error:', error);
 
-      // Add error message
       const errorMessage: Omit<Message, 'id' | 'timestamp'> = {
         userId: 'system',
         userName: '系统',
@@ -102,6 +118,14 @@ export default function ChatPage() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleQuickCommand = (command: string) => {
+    setQuickCommand(command);
+  };
+
+  const handleTaskClick = (task: Task) => {
+    setSelectedTask(task);
   };
 
   return (
@@ -124,6 +148,12 @@ export default function ChatPage() {
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Session selector */}
+            <SessionList />
+
+            {/* Quick commands */}
+            <QuickCommands onSelect={handleQuickCommand} />
+
             <button
               onClick={() => router.push('/settings')}
               className="px-3 py-1.5 rounded-lg text-sm bg-gray-800 text-gray-300 hover:bg-gray-700 transition-colors"
@@ -163,11 +193,22 @@ export default function ChatPage() {
         )}
 
         {/* Input */}
-        <MessageInput agents={agents} onSend={handleSendMessage} disabled={isLoading} />
+        <MessageInput
+          agents={agents}
+          onSend={handleSendMessage}
+          disabled={isLoading}
+          defaultValue={quickCommand}
+          onClearQuickCommand={() => setQuickCommand('')}
+        />
       </div>
 
       {/* Right sidebar - Task panel */}
-      {showTaskPanel && <TaskPanel tasks={tasks} agents={agents} />}
+      {showTaskPanel && <TaskPanel tasks={tasks} agents={agents} onTaskClick={handleTaskClick} />}
+
+      {/* Task detail modal */}
+      {selectedTask && (
+        <TaskDetailModal task={selectedTask} onClose={() => setSelectedTask(null)} />
+      )}
     </div>
   );
 }

@@ -8,6 +8,8 @@ export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'failed';
 
 export type MessageType = 'user' | 'agent' | 'system';
 
+export type FeedbackType = 'like' | 'dislike' | null;
+
 export interface User {
   id: string;
   name: string;
@@ -35,6 +37,11 @@ export interface Message {
   type: MessageType;
   agentId?: string;
   mentions?: string[];
+  feedback?: FeedbackType;
+  usage?: {
+    inputTokens: number;
+    outputTokens: number;
+  };
 }
 
 export interface Task {
@@ -54,4 +61,22 @@ export interface TaskResult {
   taskId: string;
   result: string;
   timestamp: number;
+}
+
+// Statistics
+export interface AgentStats {
+  agentId: string;
+  totalTasks: number;
+  completedTasks: number;
+  totalMessages: number;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+}
+
+export interface UsageStats {
+  totalSessions: number;
+  totalMessages: number;
+  totalTasks: number;
+  totalInputTokens: number;
+  totalOutputTokens: number;
 }

@@ -8,9 +8,10 @@ import { getAgentInfo } from '@/store';
 interface TaskPanelProps {
   tasks: Task[];
   agents: Agent[];
+  onTaskClick?: (task: Task) => void;
 }
 
-export function TaskPanel({ tasks, agents }: TaskPanelProps) {
+export function TaskPanel({ tasks, agents, onTaskClick }: TaskPanelProps) {
   const getAgentById = (agentId?: string) => {
     if (!agentId) return null;
     // 尝试直接匹配
@@ -79,7 +80,8 @@ export function TaskPanel({ tasks, agents }: TaskPanelProps) {
               return (
                 <div
                   key={task.id}
-                  className="bg-gray-800 rounded-lg p-3 hover:bg-gray-750 transition-colors"
+                  onClick={() => onTaskClick?.(task)}
+                  className="bg-gray-800 rounded-lg p-3 hover:bg-gray-750 transition-colors cursor-pointer"
                 >
                   <div className="flex items-start justify-between gap-2 mb-2">
                     <h4 className="font-medium text-white text-sm flex-1 line-clamp-2">{task.title}</h4>

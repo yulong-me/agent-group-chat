@@ -1,19 +1,29 @@
 'use client';
 
-import { useState, useRef, KeyboardEvent } from 'react';
+import { useState, useRef, KeyboardEvent, useEffect } from 'react';
 import { Agent } from '@/types';
 
 interface MessageInputProps {
   agents: Agent[];
   onSend: (content: string, mentions: string[]) => void;
   disabled?: boolean;
+  defaultValue?: string;
+  onClearQuickCommand?: () => void;
 }
 
-export function MessageInput({ agents, onSend, disabled }: MessageInputProps) {
+export function MessageInput({ agents, onSend, disabled, defaultValue, onClearQuickCommand }: MessageInputProps) {
   const [content, setContent] = useState('');
   const [showMentions, setShowMentions] = useState(false);
   const [mentionFilter, setMentionFilter] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Update content when defaultValue changes
+  useEffect(() => {
+    if (defaultValue) {
+      setContent(defaultValue);
+      onClearQuickCommand?.();
+    }
+  }, [defaultValue, onClearQuickCommand]);
 
   const filteredAgents = agents.filter((agent) =>
     agent.name.toLowerCase().includes(mentionFilter.toLowerCase()) ||
@@ -24,14 +34,12 @@ export function MessageInput({ agents, onSend, disabled }: MessageInputProps) {
     const value = e.target.value;
     setContent(value);
 
-    // Check for @ mention
     const cursorPos = e.target.selectionStart;
     const textBeforeCursor = value.slice(0, cursorPos);
     const lastAtPos = textBeforeCursor.lastIndexOf('@');
 
     if (lastAtPos !== -1) {
       const textAfterAt = textBeforeCursor.slice(lastAtPos + 1);
-      // Only show mentions if there's no space after @ or the filter is empty
       if (!textAfterAt.includes(' ')) {
         setShowMentions(true);
         setMentionFilter(textAfterAt);
@@ -59,7 +67,6 @@ export function MessageInput({ agents, onSend, disabled }: MessageInputProps) {
   const handleSend = () => {
     if (!content.trim() || disabled) return;
 
-    // Parse mentions from content
     const mentions: string[] = [];
     const mentionRegex = /@(\w+(?:\s+\w+)?)/g;
     let match;
@@ -91,7 +98,6 @@ export function MessageInput({ agents, onSend, disabled }: MessageInputProps) {
 
   return (
     <div className="border-t border-gray-800 p-4 relative">
-      {/* Mention dropdown */}
       {showMentions && filteredAgents.length > 0 && (
         <div className="absolute bottom-full left-4 right-4 mb-2 bg-gray-800 border border-gray-700 rounded-lg shadow-lg overflow-hidden z-10">
           {filteredAgents.map((agent) => (
@@ -134,7 +140,7 @@ export function MessageInput({ agents, onSend, disabled }: MessageInputProps) {
 
       <div className="mt-2 text-xs text-gray-500">
         提示：使用 <code className="bg-gray-800 px-1 rounded">@角色名</code>{' '}
-        来分配任务给特定 Agent
+        来分配任务给特定 Agent | Ctrl+Enter 发送
       </div>
     </div>
   );
