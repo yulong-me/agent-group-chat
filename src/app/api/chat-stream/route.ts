@@ -237,6 +237,7 @@ export async function POST(request: NextRequest) {
               const data = JSON.parse(line);
 
               // 处理不同类型的事件
+              // 格式1: content_block_delta (增量文本)
               if (data.type === 'content_block_delta') {
                 if (data.delta?.type === 'text_delta') {
                   const contentText = data.delta.text;
@@ -244,33 +245,36 @@ export async function POST(request: NextRequest) {
                   sendEvent('content', { text: contentText, agent: 'current' });
                 }
               }
-              else if (data.type === 'content_block_start') {
-                sendEvent('thinking', { type: 'start', blockType: data.content_block?.type });
-              }
-              else if (data.type === 'content_block_stop') {
-                sendEvent('thinking', { type: 'stop' });
-              }
-              else if (data.type === 'message_start') {
-                sendEvent('status', { status: 'thinking', message: 'Agent 思考中...' });
-              }
-              else if (data.type === 'message_delta') {
-                if (data.usage?.output_tokens) {
-                  sendEvent('progress', { outputTokens: data.usage.output_tokens });
+              // 格式2: assistant message (完整消息)
+              else if (data.type === 'assistant' && data.message?.content) {
+                for (const block of data.message.content) {
+                  if (block.type === 'text') {
+                    const contentText = block.text || '';
+                    accumulatedText += contentText;
+                    sendEvent('content', { text: contentText, agent: 'current' });
+                  } else if (block.type === 'thinking') {
+                    sendEvent('thinking', { type: 'thinking', content: block.thinking });
+                  }
+                }
+                if (data.message.usage?.output_tokens) {
+                  sendEvent('progress', { outputTokens: data.message.usage.output_tokens });
                 }
               }
-              else if (data.type === 'message_stop') {
+              // 格式3: result (最终结果)
+              else if (data.type === 'result') {
+                if (data.result && !accumulatedText.includes(data.result)) {
+                  accumulatedText += data.result;
+                  sendEvent('content', { text: data.result, agent: 'current' });
+                }
                 sendEvent('status', { status: 'completed', message: '处理完成' });
               }
-              // 检测工具调用
-              else if (data.type === 'tool_use') {
-                sendEvent('tool', { tool: data.name, action: 'start', input: data.input });
+              // 初始化事件
+              else if (data.type === 'system') {
+                sendEvent('status', { status: 'ready', message: 'Claude CLI 已就绪' });
               }
-              else if (data.type === 'tool_result') {
-                sendEvent('tool', { tool: data.name, action: 'complete', result: data.content });
-              }
-              // 检测 thinking
-              else if (data.type === 'thinking_block') {
-                sendEvent('thinking', { type: 'thinking', content: data.thinking });
+              // 错误事件
+              else if (data.type === 'error' || data.subtype === 'error') {
+                sendEvent('error', { message: data.message || data.error || 'Unknown error' });
               }
             } catch {
               // 非 JSON 行可能是普通文本或错误信息
@@ -309,6 +313,22 @@ export async function POST(request: NextRequest) {
 
         child.on('close', (code) => {
           clearTimeout(timeoutId);
+
+          // 如果没有发送完成事件，手动发送
+          if (!accumulatedText) {
+            // 从 stdoutData 尝试提取 result
+            const lines = stdoutData.split('\n');
+            for (const line of lines) {
+              if (!line.trim()) continue;
+              try {
+                const data = JSON.parse(line);
+                if (data.type === 'result' && data.result) {
+                  accumulatedText = data.result;
+                  break;
+                }
+              } catch {}
+            }
+          }
 
           // 使用累积的纯文本解析响应
           const responses = parseAgentResponses(accumulatedText, targetAgents);
