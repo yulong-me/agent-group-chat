@@ -222,6 +222,7 @@ export async function POST(request: NextRequest) {
 
         let stdoutData = '';
         let stderrData = '';
+        let accumulatedText = ''; // 累积纯文本内容
 
         child.stdout?.on('data', (chunk: Buffer) => {
           const text = chunk.toString();
@@ -238,7 +239,9 @@ export async function POST(request: NextRequest) {
               // 处理不同类型的事件
               if (data.type === 'content_block_delta') {
                 if (data.delta?.type === 'text_delta') {
-                  sendEvent('content', { text: data.delta.text, agent: 'current' });
+                  const contentText = data.delta.text;
+                  accumulatedText += contentText;
+                  sendEvent('content', { text: contentText, agent: 'current' });
                 }
               }
               else if (data.type === 'content_block_start') {
@@ -307,8 +310,8 @@ export async function POST(request: NextRequest) {
         child.on('close', (code) => {
           clearTimeout(timeoutId);
 
-          // 解析完整输出
-          const responses = parseAgentResponses(stdoutData, targetAgents);
+          // 使用累积的纯文本解析响应
+          const responses = parseAgentResponses(accumulatedText, targetAgents);
 
           tasks.set(taskId, { ...task, status: code === 0 ? 'completed' : 'failed', updatedAt: Date.now() });
 
