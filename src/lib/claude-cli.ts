@@ -180,7 +180,8 @@ function parseClaudeOutput(stdout: string): ClaudeResponse {
 export async function callClaudeCLI(
   config: ClaudeCLIConfig,
   systemPrompt: string,
-  userMessage: string
+  userMessage: string,
+  timeoutMs: number = 30000 // 默认30秒超时
 ): Promise<ClaudeResponse> {
   const command = config.command || 'claude';
   const args = buildCLIArgs(config);
@@ -205,6 +206,13 @@ export async function callClaudeCLI(
     const stdoutChunks: Buffer[] = [];
     const stderrChunks: Buffer[] = [];
 
+    // 超时处理
+    const timeoutId = setTimeout(() => {
+      console.log('[Claude CLI] Timeout, killing process');
+      child.kill('SIGTERM');
+      reject(new Error('Claude CLI 调用超时 (60秒)'));
+    }, timeoutMs);
+
     child.stdout?.on('data', (chunk: Buffer) => {
       stdoutChunks.push(chunk);
     });
@@ -214,6 +222,7 @@ export async function callClaudeCLI(
     });
 
     child.on('close', (code) => {
+      clearTimeout(timeoutId);
       const stdout = Buffer.concat(stdoutChunks).toString();
       const stderr = Buffer.concat(stderrChunks).toString();
 
